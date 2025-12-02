@@ -18,7 +18,8 @@ const App: React.FC = () => {
 
   // Initialize Music
   useEffect(() => {
-    const audio = new Audio('music/the little hero.mp3');
+    // Corrected path to 'music/thelittlehero.mp3'
+    const audio = new Audio('music/thelittlehero.mp3');
     audio.loop = true;
     audio.volume = 0.3; 
     musicRef.current = audio;
@@ -36,6 +37,7 @@ const App: React.FC = () => {
       musicRef.current.pause();
       setIsMusicOn(false);
     } else {
+      // Attempt to play music, catch and log any autoplay errors
       musicRef.current.play().catch(e => console.error("Music play failed:", e));
       setIsMusicOn(true);
     }
@@ -45,11 +47,11 @@ const App: React.FC = () => {
     initAudio();
     setGameState('PLAYING');
     
-    // Try to start music on interaction
+    // Try to start music on interaction if it's not already playing
     if (musicRef.current && !isMusicOn) {
       musicRef.current.play()
         .then(() => setIsMusicOn(true))
-        .catch(e => console.log("Autoplay prevented:", e));
+        .catch(e => console.log("Autoplay prevented:", e)); // Log autoplay prevention but don't stop the app
     }
   };
 
@@ -97,6 +99,7 @@ const App: React.FC = () => {
           <button 
             onClick={toggleMusic}
             className="mt-4 pointer-events-auto flex items-center gap-2 group cursor-pointer"
+            aria-label={isMusicOn ? 'Turn music off' : 'Turn music on'}
           >
             <div className={`w-2 h-2 rounded-full transition-colors ${isMusicOn ? 'bg-green-400' : 'bg-red-400'}`}></div>
             <span className="text-[10px] font-bold tracking-[0.2em] uppercase opacity-50 group-hover:opacity-100 transition-opacity">
