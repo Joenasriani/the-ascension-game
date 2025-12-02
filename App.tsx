@@ -110,7 +110,7 @@ const App: React.FC = () => {
       {gameState === 'START' && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-pink-100 to-blue-100 z-50">
           <h1 className="text-6xl font-thin tracking-[0.3em] text-slate-700 mb-4 text-center">ASCENSION</h1>
-          <p className="text-slate-500 font-light tracking-widest mb-12 uppercase text-xs">A React VR Experience</p>
+          <p className="text-slate-500 font-light tracking-widest mb-12 uppercase text-xs">Reorient your reality</p>
           <button 
             onClick={handleStart}
             className="px-12 py-4 bg-red-400 text-white rounded-full font-light tracking-widest shadow-xl hover:bg-red-500 hover:scale-105 transition-all duration-300"
