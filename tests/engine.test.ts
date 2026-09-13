@@ -1,3 +1,4 @@
+import { blockPose } from "../game/animation";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GAME_LEVELS } from "../game/levels";
@@ -94,4 +95,64 @@ test("No traversable solids intersect in any discrete mechanism configuration", 
                 );
               }
   }
+});
+
+test("Sampled turns and lift travel avoid all other block bodies, including decor", () => {
+  const states = (b: (typeof GAME_LEVELS)[0]["blocks"][0]) =>
+    b.isRotatable
+      ? [
+          { ...b, rotation: 0 },
+          { ...b, rotation: 1 },
+        ]
+      : b.isSlideable
+        ? [
+            { ...b, sliderVal: 0 },
+            { ...b, sliderVal: 1 },
+          ]
+        : [b];
+  for (const l of GAME_LEVELS)
+    for (const moving of l.blocks.filter((b) => b.isRotatable || b.isSlideable))
+      for (const r of moving.isRotatable ? [0, 1, 2, 3] : [0]) {
+        const from = { ...moving, rotation: r, sliderVal: 0 },
+          to = {
+            ...from,
+            ...(moving.isRotatable
+              ? { rotation: (r + 1) % 4 }
+              : { sliderVal: 1 }),
+          };
+        for (let i = 0; i <= 40; i++) {
+          const pose = blockPose(from, to, i / 40),
+            size = from.size ?? { x: 1, y: 1, z: 1 };
+          for (const other of l.blocks.filter((b) => b.id !== moving.id))
+            for (const state of states(other)) {
+              const q = position(state),
+                d = state.size ?? { x: 1, y: 1, z: 1 };
+              if (Math.abs(pose.y - q.y) >= (size.y + d.y) / 2 - 0.025)
+                continue;
+              const axes = (a: number) => [
+                [Math.cos(a), Math.sin(a)],
+                [-Math.sin(a), Math.cos(a)],
+              ];
+              const A = axes(pose.angle),
+                B = axes(((state.rotation ?? 0) * Math.PI) / 2);
+              const intersects = [...A, ...B].every(
+                ([x, z]) =>
+                  Math.abs((pose.x - q.x) * x + (pose.z - q.z) * z) <
+                  (Math.abs(A[0][0] * x + A[0][1] * z) * size.x * pose.scale) /
+                    2 +
+                    (Math.abs(A[1][0] * x + A[1][1] * z) *
+                      size.z *
+                      pose.scale) /
+                      2 +
+                    (Math.abs(B[0][0] * x + B[0][1] * z) * d.x) / 2 +
+                    (Math.abs(B[1][0] * x + B[1][1] * z) * d.z) / 2 -
+                    0.025,
+              );
+              assert(
+                !intersects,
+                `Level ${l.id}: moving ${moving.id} collides with ${other.id} at ${i}/40`,
+              );
+            }
+        }
+      }
 });

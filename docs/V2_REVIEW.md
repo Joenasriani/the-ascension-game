@@ -8,7 +8,7 @@ Base: 836407d479274a64e579e4533d0b2360b00db68b. Branch: version/ascension-v2. St
 
 ### Addressed
 
-Build entry; reproducible clean install; broken audio and asset packaging; client credential removal; CDN runtime removal; gameplay/renderer separation; finite input-locked transitions; frame-independent easing; synchronized passengers; quarter-turn normalization; elevated turns to avoid adjacent walking solids; coincident lift landing repair; discrete solid overlap checks; 26 solvable levels; original authored reflections; retry-free offline core; error fallback; keyboard and HTML alternatives; reduced motion; quality selection; chapter navigation; undo; restart; staged hints; local completed-level persistence; completion ending; descriptive metadata; explicit Joe Nasr authorship; CI and browser test definitions.
+Build entry; reproducible clean install; broken audio and asset packaging; client credential removal; CDN runtime removal; gameplay/renderer separation; finite input-locked transitions; frame-independent easing; synchronized passengers; quarter-turn normalization; retracting turns to avoid adjacent walking solids; coincident lift landing repair; discrete solid overlap checks; 26 solvable levels; original authored reflections; retry-free offline core; error fallback; keyboard and HTML alternatives; reduced motion; quality selection; chapter navigation; undo; restart; staged hints; local completed-level persistence; completion ending; descriptive metadata; explicit Joe Nasr authorship; CI and browser test definitions.
 
 ### Selected creative additions
 
@@ -39,3 +39,5 @@ Shadow paths, recursive rooms, folding worlds, gravity inversion, multi-characte
 ## Recorded checks
 
 Initial candidate 5bc06f88215a53b8308883e6dcc5534b4c61578c passed all 32 unit/geometry tests and all 4 desktop/mobile browser tests in GitHub Actions run 34750972224. Both complete 26-level journeys finished with no page errors. The screenshot review found premature capture on level entry and cropped decorative supports; the follow-up keeps one WebGL canvas, waits for a rendered level, and includes support geometry in camera fitting. The same CI workflow verifies the follow-up revision.
+
+The render-ready follow-up ad309e63d73b693db9661107970fe70d017adcb4 also passed all 4 browser checks (run 34751169489). A subsequent motion audit detected overhead intersections caused by raising bridges, so turns now retract horizontally before rotation and extend afterward. The shared renderer pose is sampled at 41 points per operation against all other block bodies in every discrete neighbor configuration; the expanded suite has 33 passing tests. This is sampled geometric evidence, not a claim of continuous physics or accessory-mesh collision coverage.

@@ -26,7 +26,7 @@ Open the local address printed by Vite. No API keys, accounts or external runtim
 - Removed browser Gemini credentials, the remote Tailwind runtime, external fonts and the remote environment map. Reflections are original authored text.
 - Isolated deterministic gameplay rules from rendering. Added undo, staged solver-backed hints, restart, completion saving, chapters and ending.
 - Separated overlapping legacy lift landings; tested all discrete traversable-solid configurations.
-- Added finite eased movement, walking legs, synchronized lift riders, counterweights, raised bridge turns, rounded architecture and camera fitting.
+- Added finite eased movement, walking legs, synchronized lift riders, counterweights, retracting bridge turns, rounded architecture and camera fitting.
 - Added three actual projected-alignment puzzles, giving 26 levels in four chapters.
 - Added HTML action alternatives, modal focus containment, reduced motion and responsive layout.
 - Lazy-loaded the 3D scene; idle rendering is on demand.

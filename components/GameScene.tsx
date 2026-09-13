@@ -17,6 +17,7 @@ import {
   type Action,
 } from "../game/engine";
 import Character from "./Character";
+import { blockPose, ease } from "../game/animation";
 export interface Motion {
   from: Snapshot;
   to: Snapshot;
@@ -42,7 +43,6 @@ const mix = (a: Vector3, b: Vector3, t: number) => ({
   y: a.y + (b.y - a.y) * t,
   z: a.z + (b.z - a.z) * t,
 });
-const ease = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 function CameraRig({
   level,
   view,
@@ -128,18 +128,9 @@ function Block({
   theme: LevelData["theme"];
   reduced: boolean;
 }) {
-  const p = mix(position(old), position(data), t),
+  const p = blockPose(old, data, t),
     s = data.size ?? { x: 1, y: 1, z: 1 };
-  let before = ((old.rotation ?? 0) * Math.PI) / 2,
-    after = ((data.rotation ?? 0) * Math.PI) / 2;
-  if (after < before) after += Math.PI * 2;
-  const turning = before !== after;
-  const turnT = turning ? ease(Math.max(0, Math.min(1, (t - 0.2) / 0.6))) : t;
-  const clearance = turning
-    ? 1.08 * (t < 0.2 ? ease(t / 0.2) : t > 0.8 ? ease((1 - t) / 0.2) : 1)
-    : 0;
-  p.y += clearance;
-  const angle = before + (after - before) * turnT;
+  const angle = p.angle;
   const interact = data.isRotatable || data.isSlideable;
   const click = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
@@ -194,7 +185,11 @@ function Block({
           </mesh>
         </group>
       )}
-      <group position={[p.x, p.y, p.z]} rotation={[0, angle, 0]}>
+      <group
+        position={[p.x, p.y, p.z]}
+        rotation={[0, angle, 0]}
+        scale={[p.scale, 1, p.scale]}
+      >
         <RoundedBox
           args={[s.x, s.y, s.z]}
           radius={0.045}
@@ -319,13 +314,6 @@ function World(props: SceneProps) {
   const pa = position(old.blocks.find((b) => b.id === old.player)!),
     pb = position(target.blocks.find((b) => b.id === target.player)!);
   const player = mix(pa, pb, t);
-  if (
-    motion?.action.type === "operate" &&
-    motion.action.id === old.player &&
-    old.blocks.find((b) => b.id === old.player)?.isRotatable
-  )
-    player.y +=
-      1.08 * (t < 0.2 ? ease(t / 0.2) : t > 0.8 ? ease((1 - t) / 0.2) : 1);
   const background = useMemo(
     () =>
       new THREE.Color(level.theme.bg).lerp(new THREE.Color("#eee9dd"), 0.65),
