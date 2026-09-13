@@ -1,9 +1,9 @@
 export enum BlockType {
-  WALKABLE = 'WALKABLE',
-  ROTATOR = 'ROTATOR',
-  SLIDER = 'SLIDER',
-  BRIDGE = 'BRIDGE',
-  EMPTY = 'EMPTY'
+  WALKABLE = "WALKABLE",
+  ROTATOR = "ROTATOR",
+  SLIDER = "SLIDER",
+  BRIDGE = "BRIDGE",
+  EMPTY = "EMPTY",
 }
 
 export interface Vector3 {
@@ -21,8 +21,8 @@ export interface BlockData {
   isRotatable?: boolean;
   isSlideable?: boolean;
   sliderVal?: number; // 0 to 1
-  axis?: 'x' | 'y' | 'z'; // Axis of movement/rotation
-  crankFace?: 'front' | 'back' | 'left' | 'right' | 'auto'; // Manual handle positioning
+  axis?: "x" | "y" | "z"; // Axis of movement/rotation
+  crankFace?: "front" | "back" | "left" | "right" | "auto"; // Manual handle positioning
   links: string[]; // IDs of neighbors
 }
 
@@ -42,6 +42,9 @@ export interface LevelData {
   startBlockId: string;
   endBlockId: string;
   doorRotation?: number;
+  perspectiveLinks?: PerspectiveLink[];
+  hints?: string[];
+  chapter?: string;
 }
 
 export interface ThemeColors {
@@ -50,4 +53,9 @@ export interface ThemeColors {
   path: string;
   wheel: string;
   bg: string;
+}
+export interface PerspectiveLink {
+  from: string;
+  to: string;
+  view: number;
 }

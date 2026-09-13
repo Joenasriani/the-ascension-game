@@ -1,420 +1,392 @@
-import React, { useState, useEffect, useRef, Suspense } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrthographicCamera, Environment, ContactShadows, useCursor, OrbitControls } from '@react-three/drei';
-import * as THREE from 'three';
-import { LevelData, BlockType, Vector3, BlockData } from '../types';
-import Character from './Character';
-import { playStep, playRotate, playWin, playSlide } from '../services/audioService';
-
-// --- Constants ---
-const SLIDER_HEIGHT = 2; // How high a slider moves
-
-// --- Helper Functions for Physics/Logic ---
-
-// Get the actual world position of a block including slider offset
-const getRenderedBlockPosition = (b: BlockData): THREE.Vector3 => {
-  let y = b.position.y;
-  if (b.type === BlockType.SLIDER) {
-    y += (b.sliderVal || 0) * SLIDER_HEIGHT;
-  }
-  return new THREE.Vector3(b.position.x, y, b.position.z);
-};
-
-// Get the effective size (bounding box) based on rotation
-const getRenderedBlockSize = (b: BlockData) => {
-  const size = { x: b.size?.x || 1, y: b.size?.y || 1, z: b.size?.z || 1 };
-  
-  // If rotated 90 or 270 degrees (odd rotations), swap X and Z dimensions
-  if (b.type === BlockType.ROTATOR && (b.rotation || 0) % 2 !== 0) {
-    return { x: size.z, y: size.y, z: size.x };
-  }
-  return size;
-};
-
-// Check if two blocks are physically aligned/connecting
-const checkAlignment = (b1: BlockData, b2: BlockData): boolean => {
-  const p1 = getRenderedBlockPosition(b1);
-  const p2 = getRenderedBlockPosition(b2);
-
-  // 1. Vertical Alignment Check (Must be at same height)
-  if (Math.abs(p1.y - p2.y) > 0.1) return false;
-
-  // 2. Bounding Box Overlap/Touch Check (XZ Plane)
-  const s1 = getRenderedBlockSize(b1);
-  const s2 = getRenderedBlockSize(b2);
-
-  // Calculate extents (min/max) for both blocks
-  // Using a small epsilon (0.1) to allow "touching" to count as valid
-  const tolerance = 0.1;
-  
-  const b1Bounds = {
-    minX: p1.x - s1.x / 2, maxX: p1.x + s1.x / 2,
-    minZ: p1.z - s1.z / 2, maxZ: p1.z + s1.z / 2,
-  };
-  
-  const b2Bounds = {
-    minX: p2.x - s2.x / 2, maxX: p2.x + s2.x / 2,
-    minZ: p2.z - s2.z / 2, maxZ: p2.z + s2.z / 2,
-  };
-
-  // Check overlap in X and Z
-  // Two rectangles touch/overlap if their ranges overlap in both dimensions
-  // We expand the range slightly by tolerance to detect touching faces
-  const overlapX = (b1Bounds.minX - tolerance <= b2Bounds.maxX) && (b1Bounds.maxX + tolerance >= b2Bounds.minX);
-  const overlapZ = (b1Bounds.minZ - tolerance <= b2Bounds.maxZ) && (b1Bounds.maxZ + tolerance >= b2Bounds.minZ);
-
-  return overlapX && overlapZ;
-};
-
-// --- Components ---
-
-interface InteractiveBlockProps {
-  data: BlockData;
-  theme: any;
-  onInteract: (id: string, type: string) => void;
-  onWalk: (id: string) => void;
-  isCurrent: boolean;
+import { useLayoutEffect, useMemo, useRef } from "react";
+import {
+  Canvas,
+  useFrame,
+  useThree,
+  type ThreeEvent,
+} from "@react-three/fiber";
+import { RoundedBox, OrthographicCamera } from "@react-three/drei";
+import * as THREE from "three";
+import type { BlockData, LevelData, Vector3 } from "../types";
+import { BlockType } from "../types";
+import {
+  position,
+  canWalk,
+  perspectiveConnected,
+  type Snapshot,
+  type Action,
+} from "../game/engine";
+import Character from "./Character";
+export interface Motion {
+  from: Snapshot;
+  to: Snapshot;
+  action: Action;
+  duration: number;
+  started: number;
 }
-
-const InteractiveBlock: React.FC<InteractiveBlockProps> = ({ data, theme, onInteract, onWalk, isCurrent }) => {
-  const meshRef = useRef<THREE.Group>(null);
-  const [hovered, setHover] = useState(false);
-  const [handleHovered, setHandleHover] = useState(false);
-  
-  useCursor(hovered && !handleHovered, 'pointer', 'auto');
-  useCursor(handleHovered, 'pointer', 'auto');
-
-  const targetRotY = data.type === BlockType.ROTATOR ? (data.rotation || 0) * (Math.PI / 2) : 0;
-  const targetY = data.type === BlockType.SLIDER 
-    ? data.position.y + (data.sliderVal || 0) * SLIDER_HEIGHT 
-    : data.position.y;
-    
-  const targetPos = new THREE.Vector3(data.position.x, targetY, data.position.z);
-
-  useFrame((state, delta) => {
-    if (meshRef.current) {
-      meshRef.current.position.lerp(targetPos, delta * 8);
-      meshRef.current.rotation.y = THREE.MathUtils.lerp(
-        meshRef.current.rotation.y, 
-        targetRotY, 
-        delta * 8
-      );
-    }
-  });
-
-  const handleWalkClick = (e: any) => {
+export interface SceneProps {
+  level: LevelData;
+  snapshot: Snapshot;
+  motion: Motion | null;
+  selected: string;
+  onSelect: (id: string) => void;
+  onAction: (a: Action) => void;
+  onSettled: () => void;
+  reduced: boolean;
+  quality: "low" | "medium" | "high";
+  paused: boolean;
+}
+const mix = (a: Vector3, b: Vector3, t: number) => ({
+  x: a.x + (b.x - a.x) * t,
+  y: a.y + (b.y - a.y) * t,
+  z: a.z + (b.z - a.z) * t,
+});
+const ease = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+function CameraRig({
+  level,
+  view,
+  quality,
+}: {
+  level: LevelData;
+  view: number;
+  quality: string;
+}) {
+  const { camera, size, invalidate } = useThree();
+  useLayoutEffect(() => {
+    const points = level.blocks
+      .filter((b) => b.type !== BlockType.EMPTY)
+      .flatMap((b) => {
+        const p = position(b);
+        return [
+          new THREE.Vector3(p.x, p.y, p.z),
+          new THREE.Vector3(p.x, p.y + (b.isSlideable ? 2 : 0) + 1.5, p.z),
+        ];
+      });
+    const box = new THREE.Box3().setFromPoints(points),
+      target = box.getCenter(new THREE.Vector3()),
+      angle = Math.PI / 4 + (view * Math.PI) / 2;
+    camera.position.set(
+      target.x + 20 * Math.sin(angle),
+      target.y + 20,
+      target.z + 20 * Math.cos(angle),
+    );
+    camera.lookAt(target);
+    camera.updateMatrixWorld();
+    const local = points.map((p) =>
+      p.clone().applyMatrix4(camera.matrixWorldInverse),
+    );
+    const span = new THREE.Box3()
+      .setFromPoints(local)
+      .getSize(new THREE.Vector3());
+    const c = camera as THREE.OrthographicCamera;
+    c.zoom = Math.min(
+      65,
+      size.width / (span.x + 5),
+      size.height / (span.y + 5),
+    );
+    c.updateProjectionMatrix();
+    invalidate();
+  }, [camera, size.width, size.height, level, view, quality, invalidate]);
+  return null;
+}
+function Block({
+  data,
+  old,
+  t,
+  selected,
+  valid,
+  current,
+  goal,
+  onSelect,
+  onAction,
+  theme,
+  reduced,
+}: {
+  data: BlockData;
+  old: BlockData;
+  t: number;
+  selected: boolean;
+  valid: boolean;
+  current: boolean;
+  goal: boolean;
+  onSelect: (id: string) => void;
+  onAction: (a: Action) => void;
+  theme: LevelData["theme"];
+  reduced: boolean;
+}) {
+  const p = mix(position(old), position(data), t),
+    s = data.size ?? { x: 1, y: 1, z: 1 };
+  let before = ((old.rotation ?? 0) * Math.PI) / 2,
+    after = ((data.rotation ?? 0) * Math.PI) / 2;
+  if (after < before) after += Math.PI * 2;
+  const turning = before !== after;
+  const turnT = turning ? ease(Math.max(0, Math.min(1, (t - 0.2) / 0.6))) : t;
+  const clearance = turning
+    ? 1.08 * (t < 0.2 ? ease(t / 0.2) : t > 0.8 ? ease((1 - t) / 0.2) : 1)
+    : 0;
+  p.y += clearance;
+  const angle = before + (after - before) * turnT;
+  const interact = data.isRotatable || data.isSlideable;
+  const click = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
-    onWalk(data.id);
+    onSelect(data.id);
+    onAction({ type: "walk", id: data.id });
   };
-
-  const handleInteractClick = (e: any) => {
+  const operate = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
-    if (data.isRotatable) onInteract(data.id, 'rotate');
-    else if (data.isSlideable) onInteract(data.id, 'slide');
+    onSelect(data.id);
+    onAction({ type: "operate", id: data.id });
   };
-
-  const matColor = data.type === BlockType.ROTATOR || data.type === BlockType.SLIDER ? theme.wheel : theme.path;
-  const geoArgs: [number, number, number] = [
-    data.size?.x || 1, 
-    data.size?.y || 1, 
-    data.size?.z || 1
-  ];
-
-  // Logic to position the handle based on face
-  const sizeX = data.size?.x || 1;
-  const sizeZ = data.size?.z || 1;
-  const face = data.crankFace || 'auto';
-  
-  let handleGroupPos: [number, number, number] = [0, 0, 0];
-  let handleGroupRot: [number, number, number] = [0, 0, 0];
-
-  if (face === 'front') {
-      handleGroupPos = [0, 0, sizeZ / 2];
-      handleGroupRot = [Math.PI / 2, 0, 0];
-  } else if (face === 'back') {
-      handleGroupPos = [0, 0, -sizeZ / 2];
-      handleGroupRot = [-Math.PI / 2, 0, 0];
-  } else if (face === 'right') {
-      handleGroupPos = [sizeX / 2, 0, 0];
-      handleGroupRot = [0, 0, -Math.PI / 2];
-  } else if (face === 'left') {
-      handleGroupPos = [-sizeX / 2, 0, 0];
-      handleGroupRot = [0, 0, Math.PI / 2];
-  } else {
-      // Auto logic: Place on the wider face (usually exposed)
-      const isOnZFace = sizeX >= sizeZ;
-      if (isOnZFace) {
-          handleGroupPos = [0, 0, sizeZ / 2];
-          handleGroupRot = [Math.PI / 2, 0, 0];
-      } else {
-          handleGroupPos = [sizeX / 2, 0, 0];
-          handleGroupRot = [0, 0, -Math.PI / 2];
-      }
-  }
-    
-  const isSlider = data.type === BlockType.SLIDER;
-  
-  // Static track position calculation (outside animated group)
-  // Positioned relative to world, slightly behind the block center to avoid clipping with agent
-  const trackPosition: [number, number, number] = [
-    data.position.x,
-    data.position.y + SLIDER_HEIGHT / 2,
-    data.position.z - 0.45
-  ];
-
+  const color =
+    data.type === BlockType.EMPTY
+      ? theme.stone
+      : interact
+        ? theme.wheel
+        : theme.path;
   return (
     <>
-      <group ref={meshRef} position={[data.position.x, data.position.y, data.position.z]}>
-        {/* Block Body */}
-        <mesh 
-          onClick={handleWalkClick} 
-          onPointerOver={(e) => { e.stopPropagation(); setHover(true); }} 
-          onPointerOut={(e) => { e.stopPropagation(); setHover(false); }}
-          castShadow 
-          receiveShadow
-        >
-          <boxGeometry args={geoArgs} />
-          <meshStandardMaterial color={matColor} roughness={0.8} />
-        </mesh>
-        
-        {/* Interactive Handle */}
-        {(data.isRotatable || data.isSlideable) && (
-          <group 
-            position={handleGroupPos}
-            rotation={handleGroupRot}
-            onClick={handleInteractClick}
-            onPointerOver={(e) => { e.stopPropagation(); setHandleHover(true); }} 
-            onPointerOut={(e) => { e.stopPropagation(); setHandleHover(false); }}
+      {data.isSlideable && (
+        <group>
+          <mesh
+            position={[
+              data.position.x - 0.36,
+              data.position.y + 1,
+              data.position.z - 0.38,
+            ]}
           >
-            {/* Stem */}
-            <mesh position={[0, 0.1, 0]}>
-              <cylinderGeometry args={[0.1, 0.1, 0.2, 16]} />
-              <meshStandardMaterial color="#555" />
-            </mesh>
-            
-            {/* Knob Base */}
-            <mesh position={[0, 0.25, 0]}>
-              <cylinderGeometry args={[0.3, 0.3, 0.1, 32]} />
-              <meshStandardMaterial 
-                color={handleHovered ? "#ff7675" : "#d63031"} 
-                emissive={handleHovered ? "#ff7675" : "#000"}
-                emissiveIntensity={0.5}
-              />
-            </mesh>
-            
-            {/* Knob Detail (White Cap) */}
-            <mesh position={[0, 0.31, 0]}>
-                <cylinderGeometry args={[0.15, 0.15, 0.05, 16]} />
-                <meshStandardMaterial color="#fff" />
-            </mesh>
-
-            {/* Hover Halo */}
-            {handleHovered && (
-              <mesh position={[0, 0.25, 0]} rotation={[0,0,0]}>
-                <ringGeometry args={[0.35, 0.45, 32]} />
-                <meshBasicMaterial color="#fff" side={THREE.DoubleSide} transparent opacity={0.5} />
-              </mesh>
-            )}
-          </group>
-        )}
-
-        {/* Decor for Rotators (Top Circle) */}
-        {(data.isRotatable) && (
-          <mesh position={[0, (data.size?.y || 1)/2 + 0.01, 0]} rotation={[-Math.PI/2, 0, 0]}>
-            <ringGeometry args={[0.3, 0.4, 32]} />
-            <meshStandardMaterial color="#fff" opacity={0.5} transparent />
+            <boxGeometry args={[0.07, 3, 0.07]} />
+            <meshStandardMaterial color="#625957" />
+          </mesh>
+          <mesh
+            position={[
+              data.position.x + 0.36,
+              data.position.y + 1,
+              data.position.z - 0.38,
+            ]}
+          >
+            <boxGeometry args={[0.07, 3, 0.07]} />
+            <meshStandardMaterial color="#625957" />
+          </mesh>
+          <mesh
+            position={[
+              p.x,
+              data.position.y + 2 - (p.y - data.position.y),
+              p.z - 0.67,
+            ]}
+            castShadow
+          >
+            <boxGeometry args={[0.5, 0.45, 0.25]} />
+            <meshStandardMaterial color="#746657" />
+          </mesh>
+        </group>
+      )}
+      <group position={[p.x, p.y, p.z]} rotation={[0, angle, 0]}>
+        <RoundedBox
+          args={[s.x, s.y, s.z]}
+          radius={0.045}
+          smoothness={2}
+          castShadow
+          receiveShadow
+          onClick={data.type !== BlockType.EMPTY ? click : undefined}
+        >
+          <meshStandardMaterial
+            color={color}
+            roughness={0.85}
+            metalness={0}
+            emissive={selected ? "#403124" : "#000000"}
+            emissiveIntensity={selected ? 0.12 : 0}
+          />
+        </RoundedBox>
+        {data.type !== BlockType.EMPTY && (
+          <mesh
+            position={[0, s.y / 2 + 0.007, 0]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <ringGeometry
+              args={[current ? 0.23 : 0.11, current ? 0.27 : 0.145, 32]}
+            />
+            <meshBasicMaterial
+              color={current ? "#34312c" : valid ? "#fff9df" : "#786454"}
+              transparent
+              opacity={current || valid ? 0.9 : 0.35}
+              depthWrite={false}
+            />
           </mesh>
         )}
+        {interact && (
+          <group
+            position={[0, s.y / 2 + 0.1, s.z / 2 + 0.23]}
+            onClick={operate}
+          >
+            <mesh position={[0, 0.1, 0]} castShadow>
+              <cylinderGeometry args={[0.16, 0.19, 0.2, 16]} />
+              <meshStandardMaterial color="#694c3b" />
+            </mesh>
+            <mesh position={[0.16, 0.22, 0]} castShadow>
+              <boxGeometry args={[0.44, 0.06, 0.08]} />
+              <meshStandardMaterial color="#f9eddb" />
+            </mesh>
+            <mesh position={[0.34, 0.28, 0]} castShadow>
+              <cylinderGeometry args={[0.065, 0.065, 0.15, 12]} />
+              <meshStandardMaterial color="#a34232" />
+            </mesh>
+          </group>
+        )}
+        {data.isRotatable && (
+          <mesh position={[0, -s.y / 2 - 0.15, 0]} castShadow>
+            <cylinderGeometry args={[0.28, 0.4, 0.3, 24]} />
+            <meshStandardMaterial color="#6d5b53" />
+          </mesh>
+        )}
+        {goal && (
+          <group position={[0, s.y / 2, 0]}>
+            <mesh position={[-0.31, 0.61, 0]} castShadow>
+              <boxGeometry args={[0.14, 1.22, 0.2]} />
+              <meshStandardMaterial color="#f4e9d5" />
+            </mesh>
+            <mesh position={[0.31, 0.61, 0]} castShadow>
+              <boxGeometry args={[0.14, 1.22, 0.2]} />
+              <meshStandardMaterial color="#f4e9d5" />
+            </mesh>
+            <mesh position={[0, 1.18, 0]} castShadow>
+              <boxGeometry args={[0.75, 0.16, 0.2]} />
+              <meshStandardMaterial color="#f4e9d5" />
+            </mesh>
+            <mesh position={[0, 0.61, -0.075]}>
+              <planeGeometry args={[0.48, 1.1]} />
+              <meshStandardMaterial color="#3e3a36" side={THREE.DoubleSide} />
+            </mesh>
+          </group>
+        )}
       </group>
-
-      {/* Slider Visual Track - Static, outside animated group */}
-      {isSlider && (
-        <mesh position={trackPosition} castShadow receiveShadow>
-            <boxGeometry args={[0.1, SLIDER_HEIGHT + (data.size?.y||1), 0.1]} />
-            <meshStandardMaterial color="#2d3436" roughness={1} />
-        </mesh>
-      )}
     </>
   );
-};
-
-const DecorBlock: React.FC<{ data: BlockData; theme: any }> = ({ data, theme }) => {
-  return (
-    <mesh position={[data.position.x, data.position.y, data.position.z]} receiveShadow>
-       <boxGeometry args={[data.size?.x || 1, data.size?.y || 1, data.size?.z || 1]} />
-       <meshStandardMaterial color={theme.stone} />
-    </mesh>
-  );
-};
-
-// --- Scene Manager ---
-
-interface SceneContentProps {
-  level: LevelData;
-  onWin: () => void;
 }
-
-const SceneContent: React.FC<SceneContentProps> = ({ level, onWin }) => {
-  const [blocks, setBlocks] = useState<BlockData[]>(level.blocks);
-  const [playerBlockId, setPlayerBlockId] = useState(level.startBlockId);
-  const [playerPosition, setPlayerPosition] = useState<Vector3>({x:0, y:0, z:0});
-  
-  // Initialize Level
-  useEffect(() => {
-    setBlocks(level.blocks);
-    setPlayerBlockId(level.startBlockId);
-    const start = level.blocks.find(b => b.id === level.startBlockId);
-    if(start) {
-      setPlayerPosition(getRenderedBlockPosition(start));
+function World(props: SceneProps) {
+  const { level, snapshot: s, motion, reduced, onSettled } = props;
+  const { invalidate } = useThree();
+  const clock = useRef({ t: motion ? 0 : 1, done: false });
+  // The scene re-renders only while a finite transition is active.
+  const [frame, setFrame] = useFrameState();
+  useLayoutEffect(() => {
+    clock.current = { t: motion ? 0 : 1, done: false };
+    setFrame(0);
+    invalidate();
+  }, [motion, invalidate]);
+  useFrame(() => {
+    if (!motion || props.paused) return;
+    const t = Math.min(
+      1,
+      (performance.now() - motion.started) / motion.duration,
+    );
+    clock.current.t = t;
+    setFrame(t);
+    if (t < 1) invalidate();
+    else if (!clock.current.done) {
+      clock.current.done = true;
+      onSettled();
     }
-  }, [level]);
-
-  const getBlock = (id: string) => blocks.find(b => b.id === id);
-
-  const handleInteract = (id: string, action: string) => {
-    // 1. Calculate New State
-    let newBlocks = [...blocks];
-    const bIndex = newBlocks.findIndex(b => b.id === id);
-    if (bIndex === -1) return;
-    
-    const oldBlock = newBlocks[bIndex];
-    const newBlock = { ...oldBlock };
-
-    if (action === 'rotate') {
-      playRotate();
-      newBlock.rotation = (oldBlock.rotation || 0) + 1;
-    } else if (action === 'slide') {
-      playSlide();
-      newBlock.sliderVal = oldBlock.sliderVal === 0 ? 1 : 0;
-    }
-    
-    // Update blocks state
-    newBlocks[bIndex] = newBlock;
-    setBlocks(newBlocks);
-
-    // 2. Sync Player if they are on the moving block
-    if (id === playerBlockId) {
-      // Calculate where the block is moving to
-      // Need to use the NEW block state
-      const newPos = getRenderedBlockPosition(newBlock);
-      setPlayerPosition(newPos);
-    }
-  };
-
-  const handleWalk = (targetId: string) => {
-    if (playerBlockId === targetId) return;
-
-    const current = getBlock(playerBlockId);
-    const target = getBlock(targetId);
-    
-    if (!current || !target) return;
-
-    // Check 1: Are they linked in the level graph?
-    const isLinked = current.links.includes(targetId) || target.links.includes(playerBlockId);
-    
-    if (isLinked) {
-        // Check 2: Are they physically aligned right now?
-        const aligned = checkAlignment(current, target);
-        
-        if (aligned) {
-          playStep();
-          setPlayerBlockId(targetId);
-          
-          // Get target position including any slider offsets
-          const targetPos = getRenderedBlockPosition(target);
-          setPlayerPosition(targetPos);
-
-          if (targetId === level.endBlockId) {
-              playWin();
-              setTimeout(onWin, 1000);
-          }
-        } else {
-           // Optional: Play a "can't move" sound or visual shake
-        }
-    }
-  };
-
+  });
+  const t = motion ? ease(frame) : 1,
+    old = motion?.from ?? s,
+    target = motion?.to ?? s;
+  const pa = position(old.blocks.find((b) => b.id === old.player)!),
+    pb = position(target.blocks.find((b) => b.id === target.player)!);
+  const player = mix(pa, pb, t);
+  if (
+    motion?.action.type === "operate" &&
+    motion.action.id === old.player &&
+    old.blocks.find((b) => b.id === old.player)?.isRotatable
+  )
+    player.y +=
+      1.08 * (t < 0.2 ? ease(t / 0.2) : t > 0.8 ? ease((1 - t) / 0.2) : 1);
+  const background = useMemo(
+    () =>
+      new THREE.Color(level.theme.bg).lerp(new THREE.Color("#eee9dd"), 0.65),
+    [level],
+  );
   return (
     <>
-      <color attach="background" args={[level.theme.bg]} />
-      <fog attach="fog" args={[level.theme.fog, 20, 80]} />
-      
-      <group rotation={[0, Math.PI / 4, 0]}>
-        {blocks.map(block => (
-          block.type === BlockType.EMPTY ? (
-            <DecorBlock key={block.id} data={block} theme={level.theme} />
-          ) : (
-            <InteractiveBlock 
-              key={block.id} 
-              data={block} 
-              theme={level.theme}
-              onInteract={handleInteract}
-              onWalk={handleWalk}
-              isCurrent={block.id === playerBlockId}
-            />
-          )
+      <color attach="background" args={[background]} />
+      <CameraRig
+        level={level}
+        view={old.view + (((target.view - old.view + 6) % 4) - 2) * t}
+        quality={props.quality}
+      />
+      <hemisphereLight args={["#fff4df", "#9c8996", 2]} />
+      <directionalLight
+        position={[4, 16, 8]}
+        intensity={2.8}
+        castShadow={props.quality !== "low"}
+        shadow-mapSize={props.quality === "high" ? [2048, 2048] : [1024, 1024]}
+        shadow-camera-left={-18}
+        shadow-camera-right={18}
+        shadow-camera-top={18}
+        shadow-camera-bottom={-18}
+        shadow-camera-far={65}
+        shadow-normalBias={0.04}
+      />
+      <group>
+        {target.blocks.map((b) => (
+          <Block
+            key={b.id}
+            data={b}
+            old={old.blocks.find((x) => x.id === b.id) ?? b}
+            t={t}
+            selected={props.selected === b.id}
+            valid={canWalk(level, s, b.id)}
+            current={s.player === b.id}
+            goal={b.id === level.endBlockId}
+            onSelect={props.onSelect}
+            onAction={props.onAction}
+            theme={level.theme}
+            reduced={reduced}
+          />
         ))}
-        <Character position={playerPosition} color={level.theme.accent} />
-        
-        {/* End Goal Indicator */}
-        {(() => {
-           const end = getBlock(level.endBlockId);
-           if (!end) return null;
-           const endPos = getRenderedBlockPosition(end);
-           const doorRot = level.doorRotation || 0;
-           return (
-             <mesh position={[endPos.x, endPos.y + 1, endPos.z]} rotation={[0, doorRot, 0]}>
-               <boxGeometry args={[0.6, 1.2, 0.1]} />
-               <meshStandardMaterial color="#333" />
-             </mesh>
-           )
-        })()}
+        <Character
+          position={player}
+          from={pa}
+          progress={frame}
+          walking={!!motion && motion.action.type === "walk"}
+          reduced={reduced}
+          color="#9f4437"
+          transfer={
+            !!motion &&
+            motion.action.type === "walk" &&
+            perspectiveConnected(level, old, old.player, target.player)
+          }
+        />
       </group>
-      
-      <ContactShadows position={[0, -4, 0]} opacity={0.4} scale={40} blur={2.5} far={10} />
-      <Environment preset="city" />
     </>
   );
-};
-
-export interface GameSceneProps {
-  level: LevelData;
-  onWin: () => void;
 }
-
-const GameScene: React.FC<GameSceneProps> = ({ level, onWin }) => {
+// React state updates are scoped to the active finite animation; idle rendering uses demand mode.
+import { useState } from "react";
+function useFrameState() {
+  return useState(0);
+}
+export default function GameScene(props: SceneProps) {
   return (
-    <div className="w-full h-full">
-      <Canvas shadows dpr={[1, 2]}>
-        <OrthographicCamera 
-            makeDefault 
-            position={[20, 20, 20]} 
-            zoom={40} 
-            near={-50} 
-            far={200}
-        />
-        {/* Enable pan to support tall levels */}
-        <OrbitControls 
-          enableRotate={true}
-          enableZoom={true}
-          enablePan={true}
-          minZoom={20}
-          maxZoom={100}
-          maxPolarAngle={Math.PI / 2 - 0.1}
-        />
-        <ambientLight intensity={0.5} />
-        <directionalLight 
-          position={[10, 20, 5]} 
-          intensity={1.2} 
-          castShadow 
-          shadow-mapSize={[1024, 1024]}
-        />
-        <Suspense fallback={null}>
-            <SceneContent level={level} onWin={onWin} />
-        </Suspense>
-      </Canvas>
-    </div>
+    <Canvas
+      shadows={props.quality !== "low"}
+      dpr={
+        props.quality === "low"
+          ? 1
+          : props.quality === "medium"
+            ? [1, 1.5]
+            : [1, 2]
+      }
+      frameloop="demand"
+      gl={{ antialias: props.quality !== "low", alpha: false }}
+      fallback={
+        <p className="fallback">
+          3D is unavailable on this device. Use the accessible action controls
+          below to play.
+        </p>
+      }
+    >
+      <OrthographicCamera makeDefault near={0.1} far={150} />
+      <World {...props} />
+    </Canvas>
   );
-};
-
-export default GameScene;
+}

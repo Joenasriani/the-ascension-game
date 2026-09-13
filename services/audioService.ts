@@ -1,40 +1,69 @@
-let audioCtx: AudioContext | null = null;
-
-export const initAudio = () => {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+let ctx: AudioContext | null = null;
+let enabled = true;
+let music: HTMLAudioElement | null = null;
+export function setSound(on: boolean) {
+  enabled = on;
+  if (!on) music?.pause();
+}
+export function initAudio() {
+  try {
+    ctx ??= new AudioContext();
+    void ctx.resume().catch(() => {});
+  } catch {
+    /* Visual feedback remains available. */
   }
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
+}
+export function playTone(freq: number, duration = 0.18, volume = 0.035) {
+  if (!enabled) return;
+  initAudio();
+  if (!ctx) return;
+  const c = ctx,
+    o = c.createOscillator(),
+    g = c.createGain();
+  o.type = "sine";
+  o.frequency.value = freq;
+  g.gain.setValueAtTime(0, c.currentTime);
+  g.gain.linearRampToValueAtTime(volume, c.currentTime + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration);
+  o.connect(g);
+  g.connect(c.destination);
+  o.start();
+  o.stop(c.currentTime + duration);
+  o.onended = () => {
+    o.disconnect();
+    g.disconnect();
+  };
+}
+export function playAction(
+  kind: "walk" | "operate" | "view" | "invalid" | "win",
+  step = 0,
+) {
+  const scale = [220, 261.63, 293.66, 329.63, 392, 440];
+  const tone = scale[step % scale.length];
+  playTone(
+    kind === "invalid"
+      ? 110
+      : kind === "operate"
+        ? tone / 2
+        : kind === "view"
+          ? tone * 1.5
+          : kind === "win"
+            ? 660
+            : tone,
+    kind === "operate" ? 0.5 : 0.2,
+  );
+}
+export async function toggleMusic(on: boolean) {
+  music ??= new Audio(`${import.meta.env.BASE_URL}music/thelittlehero.mp3`);
+  music.loop = true;
+  music.volume = 0.18;
+  if (!on) {
+    music.pause();
+    return false;
   }
-};
-
-export const playTone = (freq: number, type: OscillatorType = 'sine', duration: number = 0.3, vol: number = 0.1) => {
-  if (!audioCtx) initAudio();
-  if (!audioCtx) return;
-
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-
-  gain.gain.setValueAtTime(0, audioCtx.currentTime);
-  gain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + 0.05);
-  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  osc.start();
-  osc.stop(audioCtx.currentTime + duration);
-};
-
-export const playStep = () => playTone(600 + Math.random() * 100, 'sine', 0.1, 0.05);
-export const playRotate = () => playTone(150, 'triangle', 0.5, 0.05);
-export const playWin = () => {
-  playTone(440, 'sine', 0.5, 0.1);
-  setTimeout(() => playTone(554, 'sine', 0.5, 0.1), 200);
-  setTimeout(() => playTone(659, 'sine', 0.8, 0.1), 400);
-};
-export const playSlide = () => playTone(200, 'square', 0.2, 0.03);
+  await music.play();
+  return true;
+}
+export function pauseMusic() {
+  music?.pause();
+}
