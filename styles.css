@@ -580,3 +580,9 @@ kbd {
     display: none;
   }
 }
+@media (pointer: coarse) {
+  button,
+  select {
+    min-height: 44px;
+  }
+}

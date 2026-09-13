@@ -32,6 +32,7 @@ export interface SceneProps {
   onSelect: (id: string) => void;
   onAction: (a: Action) => void;
   onSettled: () => void;
+  onReady: (id: number) => void;
   reduced: boolean;
   quality: "low" | "medium" | "high";
   paused: boolean;
@@ -53,15 +54,28 @@ function CameraRig({
 }) {
   const { camera, size, invalidate } = useThree();
   useLayoutEffect(() => {
-    const points = level.blocks
-      .filter((b) => b.type !== BlockType.EMPTY)
-      .flatMap((b) => {
-        const p = position(b);
-        return [
-          new THREE.Vector3(p.x, p.y, p.z),
-          new THREE.Vector3(p.x, p.y + (b.isSlideable ? 2 : 0) + 1.5, p.z),
-        ];
-      });
+    const points = level.blocks.flatMap((b) => {
+      const p = position(b),
+        d = b.size ?? { x: 1, y: 1, z: 1 };
+      const radius = b.isRotatable ? Math.hypot(d.x, d.z) / 2 : 0;
+      const result: THREE.Vector3[] = [];
+      for (const x of [-1, 1])
+        for (const z of [-1, 1])
+          for (const y of [-1, 1])
+            result.push(
+              new THREE.Vector3(
+                p.x + x * (radius || d.x / 2),
+                p.y +
+                  (y < 0
+                    ? -d.y / 2
+                    : d.y / 2 +
+                      (b.isSlideable ? 2 : 0) +
+                      (b.type !== BlockType.EMPTY ? 1.5 : 0)),
+                p.z + z * (radius || d.z / 2),
+              ),
+            );
+      return result;
+    });
     const box = new THREE.Box3().setFromPoints(points),
       target = box.getCenter(new THREE.Vector3()),
       angle = Math.PI / 4 + (view * Math.PI) / 2;
@@ -81,8 +95,8 @@ function CameraRig({
     const c = camera as THREE.OrthographicCamera;
     c.zoom = Math.min(
       65,
-      size.width / (span.x + 5),
-      size.height / (span.y + 5),
+      size.width / (span.x + 2.5),
+      (size.height - 65) / (span.y + 2.5),
     );
     c.updateProjectionMatrix();
     invalidate();
@@ -265,6 +279,14 @@ function Block({
 function World(props: SceneProps) {
   const { level, snapshot: s, motion, reduced, onSettled } = props;
   const { invalidate } = useThree();
+  const ready = useRef(false);
+  const readyFrame = useRef<number | null>(null);
+  useLayoutEffect(
+    () => () => {
+      if (readyFrame.current !== null) cancelAnimationFrame(readyFrame.current);
+    },
+    [],
+  );
   const clock = useRef({ t: motion ? 0 : 1, done: false });
   // The scene re-renders only while a finite transition is active.
   const [frame, setFrame] = useFrameState();
@@ -274,6 +296,10 @@ function World(props: SceneProps) {
     invalidate();
   }, [motion, invalidate]);
   useFrame(() => {
+    if (!ready.current) {
+      ready.current = true;
+      readyFrame.current = requestAnimationFrame(() => props.onReady(level.id));
+    }
     if (!motion || props.paused) return;
     const t = Math.min(
       1,
@@ -386,7 +412,7 @@ export default function GameScene(props: SceneProps) {
       }
     >
       <OrthographicCamera makeDefault near={0.1} far={150} />
-      <World {...props} />
+      <World key={props.level.id} {...props} />
     </Canvas>
   );
 }

@@ -28,6 +28,10 @@ test("complete every level, save progress, revisit, and render without errors", 
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
       GAME_LEVELS[i].title,
     );
+    await expect(page.locator(".stage")).toHaveAttribute(
+      "data-scene-ready",
+      String(GAME_LEVELS[i].id),
+    );
     if (i === 0 || i === 23)
       await page.screenshot({
         path: testInfo.outputPath(`level-${i + 1}.png`),

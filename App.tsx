@@ -74,6 +74,7 @@ export default function App() {
   const [reduced, setReduced] = useState(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
+  const [sceneReady, setSceneReady] = useState(0);
   const [quality, setQuality] = useState<"low" | "medium" | "high">(
     window.innerWidth < 600 ? "low" : "medium",
   );
@@ -146,6 +147,7 @@ export default function App() {
   }, [finish]);
   function load(i: number) {
     cancel();
+    setSceneReady(0);
     setIndex(i);
     setSnapshot(initialState(GAME_LEVELS[i]));
     setHistory([]);
@@ -386,9 +388,13 @@ export default function App() {
           <section
             inert={!!panel || screen === "win"}
             className="stage"
+            data-scene-ready={
+              sceneReady === level.id ? String(level.id) : "loading"
+            }
             aria-label="Architectural game board"
+            aria-busy={!!motion}
           >
-            <SceneBoundary key={index}>
+            <SceneBoundary>
               <Suspense
                 fallback={
                   <div className="fallback">Preparing the architecture…</div>
@@ -402,6 +408,7 @@ export default function App() {
                   onSelect={setSelected}
                   onAction={act}
                   onSettled={finish}
+                  onReady={setSceneReady}
                   reduced={reduced}
                   quality={quality}
                   paused={!!panel}

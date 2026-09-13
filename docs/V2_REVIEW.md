@@ -35,3 +35,7 @@ Shadow paths, recursive rooms, folding worlds, gravity inversion, multi-characte
 4. Desktop/mobile browser journey, screenshots and normal animation checks.
 5. Human visual/comprehension review on representative hardware.
 6. Explicit merge decision after review. Main remains untouched.
+
+## Recorded checks
+
+Initial candidate 5bc06f88215a53b8308883e6dcc5534b4c61578c passed all 32 unit/geometry tests and all 4 desktop/mobile browser tests in GitHub Actions run 34750972224. Both complete 26-level journeys finished with no page errors. The screenshot review found premature capture on level entry and cropped decorative supports; the follow-up keeps one WebGL canvas, waits for a rendered level, and includes support geometry in camera fitting. The same CI workflow verifies the follow-up revision.

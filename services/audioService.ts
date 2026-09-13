@@ -3,7 +3,6 @@ let enabled = true;
 let music: HTMLAudioElement | null = null;
 export function setSound(on: boolean) {
   enabled = on;
-  if (!on) music?.pause();
 }
 export function initAudio() {
   try {
