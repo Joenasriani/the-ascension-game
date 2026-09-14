@@ -467,6 +467,276 @@ kbd {
     transition: none !important;
   }
 }
+
+/* V2 keeps the original Ascension presentation: a quiet pastel field with the
+   architecture as the focus. The utility UI remains available without turning
+   the game into a dashboard. */
+.screen-home {
+  min-height: 100svh;
+  background:
+    radial-gradient(circle at 72% 24%, rgba(255, 255, 255, 0.66), transparent 31%),
+    linear-gradient(180deg, #f8dce4 0%, #e4e9fb 55%, #dcecf6 100%);
+  color: #445064;
+}
+.screen-home header {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 5;
+  border: 0;
+  background: transparent;
+}
+.screen-home .wordmark {
+  opacity: 0.58;
+}
+.screen-home .home {
+  min-height: 100svh;
+  display: flex;
+  place-content: center;
+  place-items: center;
+  padding: 96px 24px 70px;
+  text-align: center;
+}
+.screen-home .intro {
+  position: relative;
+  z-index: 2;
+}
+.screen-home .intro h1 {
+  margin: 0 0 18px;
+  color: #4f5b70;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: clamp(48px, 8vw, 78px);
+  font-weight: 200;
+  letter-spacing: clamp(0.16em, 2.4vw, 0.3em);
+  line-height: 1;
+  text-indent: 0.3em;
+}
+.screen-home .lede {
+  margin: 0 0 44px;
+  color: #697489;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.34em;
+}
+.screen-home .primary {
+  min-width: 210px;
+  border: 0;
+  border-radius: 999px;
+  background: #ed6d72;
+  box-shadow: 0 14px 32px rgba(181, 74, 83, 0.24);
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  padding: 17px 28px;
+}
+.screen-home .primary:hover:not(:disabled) {
+  background: #e55d64;
+  box-shadow: 0 18px 36px rgba(181, 74, 83, 0.3);
+}
+.screen-home .intro .small {
+  margin-top: 20px;
+  color: #6f7889;
+  letter-spacing: 0.08em;
+}
+.screen-home .sculpture {
+  display: none;
+}
+.screen-home footer {
+  position: absolute;
+  inset: auto 5% 22px;
+  color: rgba(67, 78, 96, 0.45);
+}
+
+.screen-play {
+  min-height: 100svh;
+  overflow: hidden;
+}
+.screen-play header {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 20;
+  height: 72px;
+  border: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,.38), transparent);
+  pointer-events: none;
+}
+.screen-play header a,
+.screen-play header nav {
+  pointer-events: auto;
+}
+.screen-play .wordmark {
+  opacity: 0.52;
+}
+.screen-play nav button {
+  border-radius: 999px;
+  background: rgba(255,255,255,.28);
+  backdrop-filter: blur(10px);
+}
+.screen-play .game-heading {
+  position: absolute;
+  z-index: 12;
+  top: 78px;
+  left: 5%;
+  right: 5%;
+  border: 0;
+  pointer-events: none;
+}
+.screen-play .game-heading h1 {
+  margin: 5px 0 0;
+  color: #465164;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: clamp(24px, 3vw, 38px);
+  font-weight: 200;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.screen-play .game-heading h1 em {
+  color: inherit;
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 200;
+}
+.screen-play .game-heading .eyebrow {
+  color: rgba(54, 66, 84, .56);
+}
+.screen-play .metrics {
+  pointer-events: auto;
+}
+.screen-play .metrics button {
+  border-color: rgba(69,80,98,.2);
+  border-radius: 999px;
+  background: rgba(255,255,255,.3);
+  backdrop-filter: blur(10px);
+}
+.screen-play .stage {
+  height: 100svh;
+  min-height: 560px;
+  border: 0;
+}
+.screen-play .view-switch {
+  bottom: 118px;
+  border: 1px solid rgba(71, 83, 101, .14);
+  border-radius: 999px;
+  background: rgba(255,255,255,.54);
+  box-shadow: 0 10px 30px rgba(63,77,98,.1);
+  backdrop-filter: blur(14px);
+}
+.screen-play .view-switch button {
+  border: 0;
+  border-radius: 999px;
+}
+.screen-play .control-deck {
+  position: absolute;
+  z-index: 15;
+  right: 3%;
+  bottom: 18px;
+  left: 3%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 11px 14px;
+  border: 1px solid rgba(77,88,105,.14);
+  border-radius: 18px;
+  background: rgba(255,255,255,.58);
+  box-shadow: 0 12px 32px rgba(65,75,93,.1);
+  backdrop-filter: blur(16px);
+}
+.screen-play .feedback {
+  min-width: 0;
+}
+.screen-play .feedback p {
+  margin: 0;
+  color: #536074;
+}
+.screen-play .actions {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+.screen-play .actions label {
+  font-size: 9px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.screen-play .actions select,
+.screen-play .actions button,
+.screen-play .feedback button {
+  min-height: 44px;
+  border-color: rgba(77,88,105,.22);
+  border-radius: 999px;
+  background: rgba(255,255,255,.55);
+}
+.screen-play .actions .primary {
+  background: #e6676d;
+  border-color: #e6676d;
+}
+.screen-play .actions .small {
+  display: none;
+}
+.screen-win .veil,
+.screen-play .veil {
+  background: rgba(243, 238, 245, .54);
+  backdrop-filter: blur(16px);
+}
+.screen-play .dialog,
+.screen-win .dialog {
+  border-color: rgba(255,255,255,.7);
+  border-radius: 26px;
+  background: rgba(255,255,255,.9);
+  box-shadow: 0 30px 80px rgba(61,71,91,.2);
+}
+.screen-play .dialog .primary,
+.screen-win .dialog .primary {
+  border-radius: 999px;
+  background: #e6676d;
+  border-color: #e6676d;
+}
+
+@media (max-width: 760px) {
+  .screen-home header .wordmark,
+  .screen-play header .wordmark {
+    display: none;
+  }
+  .screen-home header,
+  .screen-play header {
+    justify-content: flex-end;
+    padding-inline: 14px;
+  }
+  .screen-home .intro h1 {
+    font-size: clamp(39px, 12vw, 58px);
+  }
+  .screen-play .game-heading {
+    top: 66px;
+  }
+  .screen-play .metrics span {
+    display: none;
+  }
+  .screen-play .control-deck {
+    align-items: stretch;
+    padding: 9px;
+  }
+  .screen-play .feedback {
+    display: none;
+  }
+  .screen-play .actions {
+    width: 100%;
+    justify-content: center;
+  }
+  .screen-play .actions label {
+    flex: 1;
+    min-width: 0;
+  }
+  .screen-play .actions select {
+    width: 100%;
+  }
+  .screen-play .actions button {
+    padding-inline: 12px;
+  }
+  .screen-play .view-switch {
+    bottom: 88px;
+  }
+}
 @media (max-width: 700px) {
   header {
     height: 75px;
