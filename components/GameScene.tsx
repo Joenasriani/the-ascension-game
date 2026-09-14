@@ -314,11 +314,7 @@ function World(props: SceneProps) {
   const pa = position(old.blocks.find((b) => b.id === old.player)!),
     pb = position(target.blocks.find((b) => b.id === target.player)!);
   const player = mix(pa, pb, t);
-  const background = useMemo(
-    () =>
-      new THREE.Color(level.theme.bg).lerp(new THREE.Color("#eee9dd"), 0.65),
-    [level],
-  );
+  const background = useMemo(() => new THREE.Color(level.theme.bg), [level]);
   return (
     <>
       <color attach="background" args={[background]} />
@@ -327,10 +323,10 @@ function World(props: SceneProps) {
         view={old.view + (((target.view - old.view + 6) % 4) - 2) * t}
         quality={props.quality}
       />
-      <hemisphereLight args={["#fff4df", "#9c8996", 2]} />
+      <hemisphereLight args={["#fffdf8", "#8ea0ba", 2.2]} />
       <directionalLight
         position={[4, 16, 8]}
-        intensity={2.8}
+        intensity={2.55}
         castShadow={props.quality !== "low"}
         shadow-mapSize={props.quality === "high" ? [2048, 2048] : [1024, 1024]}
         shadow-camera-left={-18}
