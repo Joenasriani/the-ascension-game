@@ -269,7 +269,7 @@ export default function App() {
     setPanel(p);
   };
   return (
-    <main className={reduced ? "reduced" : ""}>
+    <main className={`${reduced ? "reduced " : ""}screen-${screen}`}>
       <header inert={!!panel || screen === "win"}>
         <a
           href="https://github.com/Joenasriani/the-ascension-game"
@@ -295,25 +295,17 @@ export default function App() {
       {screen === "home" ? (
         <section inert={!!panel} className="home">
           <div className="intro">
-            <p className="eyebrow">AN ARCHITECTURAL PUZZLE / EDITION 02</p>
             <h1 ref={focus} tabIndex={-1}>
-              A change
-              <br />
-              of <em>perspective.</em>
+              ASCENSION
             </h1>
-            <p className="lede">
-              Turn a bridge. Find a footing.
-              <br />
-              See the same world from somewhere new.
-            </p>
+            <p className="lede">REORIENT YOUR REALITY</p>
             <button className="primary" onClick={() => load(progress.unlocked)}>
               {progress.completed.length
-                ? "Continue the ascent"
-                : "Begin the ascent"}{" "}
-              <span>↗</span>
+                ? "CONTINUE JOURNEY"
+                : "BEGIN JOURNEY"}
             </button>
             <p className="small">
-              26 spaces to discover · Play at your own pace
+              26 architectural puzzles · No time limit
             </p>
           </div>
           <div className="sculpture" aria-hidden="true">
@@ -321,11 +313,11 @@ export default function App() {
             <div className="sculpture-step two" />
             <div className="sculpture-step three" />
             <div className="sculpture-door" />
-            <span>FORM / MOVEMENT / PERSPECTIVE</span>
+            <span>TURN · RISE · ALIGN</span>
           </div>
           <footer>
-            <span>Architecture in motion.</span>
-            <span>Original music: The Little Hero</span>
+            <span>Architecture in motion</span>
+            <span>Created by Joe Nasr</span>
           </footer>
         </section>
       ) : screen === "ending" ? (
