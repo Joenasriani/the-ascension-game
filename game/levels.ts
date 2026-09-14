@@ -30,7 +30,7 @@ const repaired = LEVELS.map((level) => {
   }
   return {
     ...level,
-    hint: level.hint.replace(/Red Handle/g, "ivory crank"),
+    hint: level.hint,
     blocks,
     chapter:
       level.id < 7
