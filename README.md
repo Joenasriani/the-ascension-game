@@ -1,20 +1,14 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# ASCENSION — Earlier Build
 
-# Run and deploy your AI Studio app
+**Game lineage:** ASCENSION  
+**Status:** retained development build / backup  
+**Canonical game repository:** https://github.com/Joenasriani/ascension-opt  
+**Play:** https://joenasr.itch.io/ascension  
+**Creator:** Joe Nasr  
+**Creator identity:** https://joe-nasr-signals.vercel.app/v2/
 
-This contains everything you need to run your app locally.
+This repository contains an earlier application build from the ASCENSION game lineage. It is preserved as development history and is **not a separate game**.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1oJ1_IYT6-X-JVqL47JjeX-7-2Dl3eWGn
+ASCENSION is an isometric architectural puzzle game built around spatial routes, perspective, rotating structures and interactive mechanisms.
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+For the current public game identity, source description and provenance, use `Joenasriani/ascension-opt`.
